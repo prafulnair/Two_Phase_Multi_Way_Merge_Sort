@@ -52,9 +52,7 @@ def read_data_main2(filename1, filename2):
             main_list.append(line)  
             rows2 += 1
 
-    return main_list, rows1 + rows2
-
-
+    return main_list, total_records1+total_records2
 
 
 if __name__ == "__main__":
@@ -69,6 +67,9 @@ if __name__ == "__main__":
 
     main_list, rows = read_data_main2(filename1, filename2)
 
-    for records in main_list:
-        print(records)
+    # uncomment the following for loop if you want to print the loaded data
+    # for records in main_list:
+    #     print(records)
     print("TOTAL Records read and stored in main buffer: ",rows)
+
+    create_runs(main_list)
