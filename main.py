@@ -1,6 +1,7 @@
 """
 This is the first Lab Project for COMP 6521
-Coded by Praful Peethambaran Nair (40226483)
+Coded by Praful Peethambaran Nair (40226483), Aashray Munjal (), Tanay Ashish Srivastava (40234148)
+
 """
 
 """
@@ -22,6 +23,7 @@ and the second part would contain the rest of the data,
 
 
 import sys
+from heapq import merge
 from tqdm import tqdm
 
 def generate_runs(main_list, run_size):
@@ -37,7 +39,8 @@ def generate_runs(main_list, run_size):
             key = int(record[:8].strip()) # extracting the employee ID
             value = record[8:]
             run[key] = value
-        runs.append(run)
+        sorted_run = dict(sorted(run.items()))
+        runs.append(sorted_run)
 
     if remainder > 0:
         run = {}
@@ -46,7 +49,8 @@ def generate_runs(main_list, run_size):
             key = int(record[:8].strip())
             value = record[8:]
             run[key] = value
-        runs.append(run)
+        sorted_run = dict(sorted(run.items()))
+        runs.append(sorted_run)
 
     return runs 
 
@@ -80,6 +84,56 @@ def read_data_main2(filename1, filename2):
 
     return main_list, total_records1+total_records2
 
+def tpmms(sorted_runs):
+    num_runs = len(sorted_runs)
+    
+    # First pass: Merge runs into groups that fit into memory
+    group_size = 10  # Adjust group size based on available memory
+    groups = [sorted_runs[i:i+group_size] for i in range(0, num_runs, group_size)]
+    
+    # Second pass: Merge runs within each group
+    merged_groups = []
+    for group in groups:
+        merged_run = group[0] if len(group) == 1 else dict(merge(*[sorted(run.items()) for run in group]))
+        merged_groups.append(merged_run)
+    
+    # Final pass: Merge merged runs from each group
+    merged_runs = merged_groups[0] if len(merged_groups) == 1 else dict(merge(*[sorted(group.items()) for group in merged_groups]))
+    
+    return merged_runs
+
+def write_to_file(merged_runs, output_file, disk_ios, runs):
+    # Count unique records
+    unique_records = len(merged_runs)
+    
+    # Calculate number of Disk I/Os
+    total_disk_ios = disk_ios * 10  # Each Disk I/O represents the transfer of 10 records
+    
+    # Create a dictionary to store the count of each record
+    record_counts = {}
+    for key, value in merged_runs.items():
+        record_counts[key] = 1  # Initialize count to 1 for the first occurrence of each record
+
+    # Count occurrences of each record in the runs
+    for run in runs:
+        for key in run.keys():
+            if key in record_counts:
+                record_counts[key] += 1
+
+    # Sort records by their IDs
+    sorted_records = sorted(merged_runs.items(), key=lambda x: x[0])
+
+    # Write to output file
+    with open(output_file, 'w') as file:
+        file.write(f"Record Count = {unique_records}\n")
+        file.write(f"# Disk I/Os = {total_disk_ios}\n")
+        for key, value in record_counts.items():
+            file.write(f"{key}:{value}\n")
+        # Write sorted merged runs
+        for key, value in sorted_records:
+            file.write(f"Employee ID: {key}, Record: {value}\n")
+
+
 
 if __name__ == "__main__":
 
@@ -93,6 +147,8 @@ if __name__ == "__main__":
 
     main_list, rows = read_data_main2(filename1, filename2)
 
+
+
     # uncomment the following for loop if you want to print the loaded data
     # for records in main_list:
     #     print(records)
@@ -100,11 +156,20 @@ if __name__ == "__main__":
 
     runs = generate_runs(main_list, run_size=10)
 
-    for run in runs:
-        for keys in run.keys():
-            print(keys)
+    merged_runs = tpmms(runs)
 
+    # for run in runs:
+    #     for keys in run.keys():
+    #         print(keys)
+
+
+
+        # Print merged runs
+    for key, value in merged_runs.items():
+        print(f"Employee ID: {key}, Record: {value}")
+
+    print(f"Number of merged runs: {len(merged_runs)}")
+    write_to_file(merged_runs, 'output.txt', len(runs), runs)
     print(len(runs))
-
 
 
