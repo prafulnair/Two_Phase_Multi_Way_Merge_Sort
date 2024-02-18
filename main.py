@@ -1,6 +1,6 @@
 """
 This is the first Lab Project for COMP 6521
-Coded by Praful Peethambaran Nair (40226483), Aashray Munjal (), Tanay Ashish Srivastava (40234148)
+Coded by Praful Peethambaran Nair (40226483), Aashray Munjal (40227315), Tanay Ashish Srivastava (40234148)
 
 """
 
@@ -23,8 +23,12 @@ and the second part would contain the rest of the data,
 
 
 import sys
+import time
 from heapq import merge
 from tqdm import tqdm
+
+# Global variable to keep track of disk I/Os
+total_disk_ios = 0
 
 def generate_runs(main_list, run_size):
     runs = [] 
@@ -37,7 +41,7 @@ def generate_runs(main_list, run_size):
         for j in range(run_size):
             record = main_list[i*run_size+j] # extracting 10 / 20 records for the runs
             key = int(record[:8].strip()) # extracting the employee ID
-            value = record[8:]
+            value = record[8:].strip()  # extracting the rest of the data
             run[key] = value
         sorted_run = dict(sorted(run.items()))
         runs.append(sorted_run)
@@ -47,42 +51,45 @@ def generate_runs(main_list, run_size):
         for i in range(remainder):
             record = main_list[num_runs * run_size + i]
             key = int(record[:8].strip())
-            value = record[8:]
+            value = record[8:].strip()
             run[key] = value
         sorted_run = dict(sorted(run.items()))
         runs.append(sorted_run)
 
     return runs 
 
-    # Now you have variables run_1, run_2, ..., run_n, each containing an empty list
-
 def read_data_main2(filename1, filename2):
-    # Creating the main buffer. main_list will contain data from both the files..
-    # This is a temporary storage before we split the data into multiple runs based on array size. 
+    global total_disk_ios  # Access the global variable
+
     main_list = []
 
-    # For reading total number of rows in the file1
-    with open(filename1,'r') as file:
+    # Count total records in file1
+    with open(filename1, 'r') as file:
         total_records1 = len(file.readlines())
 
-    # Reading the data from the file1 to main_list 
+    # Read data from file1 to main_list 
     with open(filename1, "r") as file:
-        rows1 = 0
+        file1_read_count = 0
         for line in tqdm(file, total=total_records1, desc='Reading File 1'):
-            main_list.append(line)  
+            main_list.append(line.strip())
+            file1_read_count += 1
+            if file1_read_count % 10 == 0:  # Check if 10 records have been read
+                total_disk_ios += 1  # Increment the global variable  
 
-    # For reading total number of rows in the file2
-    with open(filename2,'r') as file:
+    # Count total records in file2
+    with open(filename2, 'r') as file:
         total_records2 = len(file.readlines())
 
-    # Reading the data from the file2 to main_list
+    # Read data from file2 to main_list
     with open(filename2, "r") as file:
-        rows2 = 0
+        file2_read_count = 0
         for line in tqdm(file, total=total_records2, desc='Reading File 2'):
-            main_list.append(line)  
-            rows2 += 1
+            main_list.append(line.strip())
+            file2_read_count += 1
+            if file2_read_count % 10 == 0:  # Check if 10 records have been read
+                total_disk_ios += 1  # Increment the global variable  
 
-    return main_list, total_records1+total_records2
+    return main_list, total_records1 + total_records2
 
 def tpmms(sorted_runs):
     num_runs = len(sorted_runs)
@@ -102,13 +109,12 @@ def tpmms(sorted_runs):
     
     return merged_runs
 
-def write_to_file(merged_runs, output_file, disk_ios, runs):
+def write_to_file(merged_runs, output_file, runs):
+    global total_disk_ios  # Access the global variable
+
     # Count unique records
     unique_records = len(merged_runs)
-    
-    # Calculate number of Disk I/Os
-    total_disk_ios = disk_ios * 10  # Each Disk I/O represents the transfer of 10 records
-    
+
     # Create a dictionary to store the count of each record
     record_counts = {}
     for key, value in merged_runs.items():
@@ -125,19 +131,23 @@ def write_to_file(merged_runs, output_file, disk_ios, runs):
 
     # Write to output file
     with open(output_file, 'w') as file:
-        file.write(f"Record Count = {unique_records}\n")
-        file.write(f"# Disk I/Os = {total_disk_ios}\n")
+
         for key, value in record_counts.items():
             file.write(f"{key}:{value}\n")
         # Write sorted merged runs
+        record_count = 0  # Initialize record count
         for key, value in sorted_records:
             file.write(f"Employee ID: {key}, Record: {value}\n")
+            record_count += 1  # Increment record count
+            if record_count % 10 == 0:  # Check if 10 records have been written
+                total_disk_ios += 1  # Increment the global variable for writing
 
 
+        file.write(f"Record Count = {unique_records}\n")
+        file.write(f"# Disk I/Os = {total_disk_ios}\n")  # Write the total Disk I/Os
 
 if __name__ == "__main__":
-
-    if len(sys.argv)!= 3:
+    if len(sys.argv) != 3:
         print("Please specify 2 filenames")
         print("Sample usage: python3 main.py filename1 filename2")
         sys.exit(1)
@@ -145,31 +155,36 @@ if __name__ == "__main__":
     filename1 = sys.argv[1]
     filename2 = sys.argv[2]
 
+    # Start timing T1
+    start_time = time.time()
+
     main_list, rows = read_data_main2(filename1, filename2)
+    
+    # End timing T1
+    t1_sort_time = time.time() - start_time
+    t1_sort_time = round(t1_sort_time, 3)
 
-
-
-    # uncomment the following for loop if you want to print the loaded data
-    # for records in main_list:
-    #     print(records)
-    # print("TOTAL Records read and stored in main buffer: ",rows)
+    # Start timing T2
+    start_time = time.time()
 
     runs = generate_runs(main_list, run_size=10)
 
     merged_runs = tpmms(runs)
 
-    # for run in runs:
-    #     for keys in run.keys():
-    #         print(keys)
+    # Write results to file
+    write_to_file(merged_runs, 'output.txt', runs)
 
+    # End timing T2
+    t2_sort_time = time.time() - start_time
+    t2_sort_time = round(t2_sort_time, 3)
 
+    # Count number of output records
+    num_output_records = len(merged_runs)
 
-        # Print merged runs
-    for key, value in merged_runs.items():
-        print(f"Employee ID: {key}, Record: {value}")
-
-    print(f"Number of merged runs: {len(merged_runs)}")
-    write_to_file(merged_runs, 'output.txt', len(runs), runs)
-    print(len(runs))
-
-
+    # Print test results
+    print("Test Results:")
+    print(f"Number of Output Records: {num_output_records}")
+    print(f"T1 Sort Time: {t1_sort_time} seconds")
+    print(f"T2 Sort Time: {t2_sort_time} seconds")
+    print(f"Number of Disk I/Os: {total_disk_ios}")
+    
