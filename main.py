@@ -93,21 +93,48 @@ def read_data_main2(filename1, filename2):
 
 def tpmms(sorted_runs):
     num_runs = len(sorted_runs)
-    
-    # First pass: Merge runs into groups that fit into memory
-    group_size = 10  # Adjust group size based on available memory
-    groups = [sorted_runs[i:i+group_size] for i in range(0, num_runs, group_size)]
-    
-    # Second pass: Merge runs within each group
-    merged_groups = []
-    for group in groups:
-        merged_run = group[0] if len(group) == 1 else dict(merge(*[sorted(run.items()) for run in group]))
-        merged_groups.append(merged_run)
-    
-    # Final pass: Merge merged runs from each group
-    merged_runs = merged_groups[0] if len(merged_groups) == 1 else dict(merge(*[sorted(group.items()) for group in merged_groups]))
-    
-    return merged_runs
+    group_size = 40  # Number of runs to consider at a time
+    merged_runs = []
+
+    # Iterate over runs in groups of group_size
+    for i in range(0, num_runs, group_size):
+        group_runs = sorted_runs[i:i+group_size]  # Get group of runs
+        group_merged = {}  # Initialize merged group
+
+        # Merge runs within the group
+        for run in group_runs:
+            group_merged.update(run)
+
+        # Sort merged group by employee ID
+        sorted_group = dict(sorted(group_merged.items()))
+
+        # Append sorted group to merged_runs
+        merged_runs.append(sorted_group)
+
+    # Continue merging until only one sorted sublist remains
+    while len(merged_runs) > 1:
+        next_merged_runs = []
+
+        # Iterate over merged_runs in groups of group_size
+        for i in range(0, len(merged_runs), group_size):
+            group_runs = merged_runs[i:i+group_size]  # Get group of merged runs
+            group_merged = {}  # Initialize merged group
+
+            # Merge runs within the group
+            for run in group_runs:
+                group_merged.update(run)
+
+            # Sort merged group by employee ID
+            sorted_group = dict(sorted(group_merged.items()))
+
+            # Append sorted group to next_merged_runs
+            next_merged_runs.append(sorted_group)
+
+        # Update merged_runs with next_merged_runs
+        merged_runs = next_merged_runs
+
+    return merged_runs[0]  # Return the final sorted sublist
+
 
 def write_to_file(merged_runs, output_file, runs):
     global total_disk_ios  # Access the global variable
@@ -132,19 +159,39 @@ def write_to_file(merged_runs, output_file, runs):
     # Write to output file
     with open(output_file, 'w') as file:
 
-        for key, value in record_counts.items():
-            file.write(f"{key}:{value}\n")
-        # Write sorted merged runs
-        record_count = 0  # Initialize record count
-        for key, value in sorted_records:
-            file.write(f"Employee ID: {key}, Record: {value}\n")
-            record_count += 1  # Increment record count
-            if record_count % 10 == 0:  # Check if 10 records have been written
-                total_disk_ios += 1  # Increment the global variable for writing
-
+        record_count = 0
+        for (key1, value1), (key2, value2) in zip(sorted_records,record_counts.items()):
+            file.write(f'{key1} {value1}: {value2}\n')
+            record_count+=1
+            if record_count % 10 == 0:
+                total_disk_ios +=1
 
         file.write(f"Record Count = {unique_records}\n")
-        file.write(f"# Disk I/Os = {total_disk_ios}\n")  # Write the total Disk I/Os
+        file.write(f"# Disk I/Os = {total_disk_ios}\n")
+
+
+
+def update_file(file_path):
+    # Read the file
+    with open(file_path, 'r') as file:
+        lines = file.readlines()
+
+    # Extract the last two lines
+    last_two_lines = lines[-2:]
+
+    # Extract the rest of the lines
+    rest_of_lines = lines[:-2]
+
+    # Prepend the last two lines to the rest of the lines
+    updated_lines = last_two_lines + rest_of_lines
+
+    # Write the updated content back to the file
+    with open(file_path, 'w') as file:
+        file.writelines(updated_lines)
+
+
+
+ 
 
 if __name__ == "__main__":
     if len(sys.argv) != 3:
@@ -173,6 +220,7 @@ if __name__ == "__main__":
 
     # Write results to file
     write_to_file(merged_runs, 'output.txt', runs)
+    update_file('output.txt')
 
     # End timing T2
     t2_sort_time = time.time() - start_time
